@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hex Patcher Tool</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    background: linear-gradient(135deg, #1e1e2e, #2a2a40);
+    min-height: 100vh;
+    color: #e0e0e0;
+    padding: 20px;
+    display: flex;
+    justify-content: center;
+  }
+  .container { max-width: 720px; width: 100%; }
+  h1 { text-align: center; font-size: 22px; margin-bottom: 6px; color: #fff; }
+  .sub { text-align: center; color: #888; font-size: 13px; margin-bottom: 20px; }
+
+  .card {
+    background: #2a2a3e;
+    border-radius: 14px;
+    padding: 18px;
+    margin-bottom: 14px;
+    border: 1px solid #3a3a52;
+  }
+  .card h2 {
+    font-size: 14px;
+    color: #8ab4ff;
+    margin-bottom: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  #dropZone {
+    border: 2px dashed #4a4a68;
+    border-radius: 12px;
+    padding: 26px 16px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s;
+    color: #aaa;
+    font-size: 14px;
+  }
+  #dropZone:hover, #dropZone.dragover {
+    border-color: #8ab4ff;
+    background: #32324a;
+    color: #fff;
+  }
+  #dropZone .icon { font-size: 32px; display: block; margin-bottom: 8px; }
+  .file-info { margin-top: 10px; font-size: 13px; color: #6ee7a0; word-break: break-all; }
+
+  .tabs {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 14px;
+  }
+  .tab {
+    flex: 1;
+    padding: 10px;
+    text-align: center;
+    background: #1e1e2e;
+    border: 1px solid #3a3a52;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 600;
+    color: #888;
+    transition: all 0.2s;
+    user-select: none;
+  }
+  .tab.active {
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    color: #fff;
+    border-color: transparent;
+  }
+
+  .mode-panel { display: none; }
+  .mode-panel.active { display: block; }
+
+  textarea {
+    width: 100%;
+    min-height: 90px;
+    background: #1e1e2e;
+    border: 1px solid #3a3a52;
+    border-radius: 8px;
+    color: #e0e0e0;
+    padding: 10px 12px;
+    font-family: 'Courier New', monospace;
+    font-size: 13px;
+    resize: vertical;
+    outline: none;
+    line-height: 1.5;
+  }
+  textarea:focus { border-color: #8ab4ff; }
+
+  .hint { font-size: 12px; color: #777; margin-top: 6px; line-height: 1.5; }
+  .hint code {
+    background: #1e1e2e;
+    padding: 1px 5px;
+    border-radius: 4px;
+    color: #8ab4ff;
+    font-size: 11px;
+  }
+
+  button {
+    width: 100%;
+    padding: 14px;
+    border: none;
+    border-radius: 10px;
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    color: #fff;
+    font-size: 15px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s;
+    margin-top: 6px;
+  }
+  button:hover { filter: brightness(1.15); }
+  button:active { transform: scale(0.98); }
+  button:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  .btn-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 6px; }
+  .btn-secondary {
+    background: #3a3a52 !important;
+    font-size: 13px !important;
+    padding: 10px !important;
+  }
+  .btn-secondary:hover { background: #4a4a68 !important; filter: none; }
+
+  #log {
+    background: #1a1a28;
+    border-radius: 10px;
+    padding: 12px;
+    font-family: 'Courier New', monospace;
+    font-size: 12px;
+    max-height: 260px;
+    overflow-y: auto;
+    white-space: pre-wrap;
+    word-break: break-all;
+    display: none;
+    line-height: 1.6;
+  }
+  .log-ok { color: #6ee7a0; }
+  .log-err { color: #ff6b6b; }
+  .log-info { color: #8ab4ff; }
+  .log-warn { color: #ffcc66; }
+  .log-dim { color: #666; }
+
+  .checkbox-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 10px;
+    font-size: 13px;
+    color: #aaa;
+    cursor: pointer;
+    user-select: none;
+  }
+  .checkbox-row input { cursor: pointer; width: 16px; height: 16px; }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>🔧 Hex Patcher</h1>
+  <p class="sub">Thả file → chọn chế độ → patch → tải về</p>
+
+  <div class="card">
+    <h2>1. File gốc</h2>
+    <div id="dropZone">
+      <span class="icon">📁</span>
+      Kéo thả file vào đây hoặc bấm để chọn
+      <input type="file" id="fileInput" hidden>
+    </div>
+    <div class="file-info" id="fileInfo"></div>
+  </div>
+
+  <div class="card">
+    <h2>2. Chế độ patch</h2>
+    <div class="tabs">
+      <div class="tab active" data-mode="auto">🔍 Auto Search</div>
+      <div class="tab" data-mode="offset">🎯 Theo Offset</div>
+    </div>
+
+    <!-- AUTO MODE -->
+    <div class="mode-panel active" id="panel-auto">
+      <textarea id="hexOrig" placeholder="Hex gốc cần tìm&#10;VD: CD ED A6 BD&#10;Hoặc nhiều dòng:&#10;CD ED A6 BD&#10;00 00 80 3F"></textarea>
+      <div class="hint">Dán hex gốc (cách nhau khoảng trắng, viết liền, nhiều dòng đều được)</div>
+
+      <textarea id="hexNew" placeholder="Hex thay thế&#10;VD: 22 6E A0 BE" style="margin-top:12px;"></textarea>
+      <div class="hint">Phải cùng số byte với hex gốc</div>
+    </div>
+
+    <!-- OFFSET MODE -->
+    <div class="mode-panel" id="panel-offset">
+      <textarea id="patchList" style="min-height:160px;" placeholder="Mỗi dòng 1 patch, định dạng:&#10;OFFSET | HEX_MỚI&#10;&#10;Ví dụ:&#10;0x7408 | 22 6E A0 BE&#10;0x7424 | 72 1C C7 BF&#10;0x742C | 00&#10;0x7439 | 48&#10;0x743B | AA BB CC DD"></textarea>
+      <div class="hint">
+        Offset hỗ trợ: <code>0x7408</code> hoặc <code>7408</code> (hex) hoặc <code>29696</code> (có <code>0d</code> phía trước)<br>
+        Hex mới: có khoảng trắng hoặc liền đều được
+      </div>
+      <label class="checkbox-row">
+        <input type="checkbox" id="verifyOrig">
+        Kiểm tra hex gốc trước khi patch (cần nhập cột gốc)
+      </label>
+      <textarea id="patchListOrig" style="margin-top:10px; display:none; min-height:120px;" placeholder="Mỗi dòng 1 hex gốc tương ứng:&#10;CD ED A6 BD&#10;00 00 80 3F&#10;02&#10;4C&#10;..."></textarea>
+    </div>
+
+    <button id="patchBtn" disabled>⚡ Patch File</button>
+    <div class="btn-row">
+      <button class="btn-secondary" id="previewBtn" disabled>👁️ Xem trước patch</button>
+      <button class="btn-secondary" id="clearBtn">🗑️ Xóa log</button>
+    </div>
+  </div>
+
+  <div id="log"></div>
+</div>
+
+<script>
+const dropZone = document.getElementById('dropZone');
+const fileInput = document.getElementById('fileInput');
+const fileInfo = document.getElementById('fileInfo');
+const patchBtn = document.getElementById('patchBtn');
+const previewBtn = document.getElementById('previewBtn');
+const clearBtn = document.getElementById('clearBtn');
+const logEl = document.getElementById('log');
+const verifyOrig = document.getElementById('verifyOrig');
+const patchListOrig = document.getElementById('patchListOrig');
+
+let fileBuffer = null;
+let fileName = '';
+let currentMode = 'auto';
+
+// ===== Log helpers =====
+function log(msg, cls = 'log-info') {
+  logEl.style.display = 'block';
+  const line = document.createElement('div');
+  line.className = cls;
+  line.textContent = msg;
+  logEl.appendChild(line);
+  logEl.scrollTop = logEl.scrollHeight;
+}
+function clearLog() { logEl.innerHTML = ''; logEl.style.display = 'none'; }
+clearBtn.addEventListener('click', clearLog);
+
+// ===== Tabs =====
+document.querySelectorAll('.tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.mode-panel').forEach(p => p.classList.remove('active'));
+    tab.classList.add('active');
+    currentMode = tab.dataset.mode;
+    document.getElementById('panel-' + currentMode).classList.add('active');
+    checkReady();
+  });
+});
+
+// ===== Verify checkbox =====
+verifyOrig.addEventListener('change', () => {
+  patchListOrig.style.display = verifyOrig.checked ? 'block' : 'none';
+  checkReady();
+});
+
+// ===== File handling =====
+dropZone.addEventListener('click', () => fileInput.click());
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('dragover'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+dropZone.addEventListener('drop', e => {
+  e.preventDefault();
+  dropZone.classList.remove('dragover');
+  if (e.dataTransfer.files.length) loadFile(e.dataTransfer.files[0]);
+});
+fileInput.addEventListener('change', e => {
+  if (e.target.files.length) loadFile(e.target.files[0]);
+});
+
+function loadFile(file) {
+  fileName = file.name;
+  const reader = new FileReader();
+  reader.onload = e => {
+    fileBuffer = new Uint8Array(e.target.result);
+    fileInfo.textContent = `✅ ${file.name} — ${fileBuffer.length.toLocaleString()} bytes`;
+    clearLog();
+    log(`Đã load file: ${file.name} (${fileBuffer.length} bytes)`, 'log-ok');
+    checkReady();
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+// ===== Hex parsing =====
+function parseHex(str) {
+  const clean = str.replace(/[^0-9a-fA-F]/g, '');
+  if (clean.length % 2 !== 0) throw new Error('Chuỗi hex có số ký tự lẻ: "' + str.trim() + '"');
+  const bytes = [];
+  for (let i = 0; i < clean.length; i += 2) bytes.push(parseInt(clean.substr(i, 2), 16));
+  return bytes;
+}
+
+function bytesToHex(bytes) {
+  return Array.from(bytes).map(b => b.toString(16).padStart(2, '0').toUpperCase()).join(' ');
+}
+
+// Parse offset
+function parseOffset(str) {
+  str = str.trim().toLowerCase();
+  if (str.startsWith('0x')) return parseInt(str, 16);
+  // Nếu có 'd' ở đầu → decimal
+  if (str.startsWith('0d')) return parseInt(str.slice(2), 10);
+  // Mặc định coi là hex nếu chứa a-f, ngược lại hex luôn cho an toàn
+  return parseInt(str, 16);
+}
+
+// ===== Ready check =====
+function checkReady() {
+  let ready = false;
+  if (fileBuffer) {
+    if (currentMode === 'auto') {
+      ready = !!(document.getElementById('hexOrig').value.trim() && document.getElementById('hexNew').value.trim());
+    } else {
+      ready = !!document.getElementById('patchList').value.trim();
+    }
+  }
+  patchBtn.disabled = !ready;
+  previewBtn.disabled = !ready;
+}
+
+['hexOrig', 'hexNew', 'patchList', 'patchListOrig'].forEach(id => {
+  document.getElementById(id).addEventListener('input', checkReady);
+});
+
+// ===== Search =====
+function findAll(haystack, needle) {
+  const positions = [];
+  if (needle.length === 0 || needle.length > haystack.length) return positions;
+  outer: for (let i = 0; i <= haystack.length - needle.length; i++) {
+    for (let j = 0; j < needle.length; j++) {
+      if (haystack[i + j] !== needle[j]) continue outer;
+    }
+    positions.push(i);
+  }
+  return positions;
+}
+
+// ===== Parse patch list =====
+function parsePatchList() {
+  const lines = document.getElementById('patchList').value.split('\n');
+  const origLines = verifyOrig.checked
+    ? document.getElementById('patchListOrig').value.split('\n')
+    : null;
+
+  const patches = [];
+  let origIdx = 0;
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
+    if (!line) continue;
+
+    // Format: OFFSET | HEX  hoặc  OFFSET,HEX  hoặc  OFFSET HEX
+    let offsetStr, hexStr;
+    if (line.includes('|')) {
+      [offsetStr, hexStr] = line.split('|').map(s => s.trim());
+    } else if (line.includes(',')) {
+      [offsetStr, hexStr] = line.split(',').map(s => s.trim());
+    } else {
+      // Tách token đầu tiên là offset, phần còn lại là hex
+      const parts = line.split(/\s+/);
+      offsetStr = parts[0];
+      hexStr = parts.slice(1).join(' ');
+    }
+
+    if (!offsetStr || !hexStr) {
+      log(`⚠️ Dòng ${i+1} không hợp lệ: "${line}"`, 'log-warn');
+      continue;
+    }
+
+    let offset;
+    try { offset = parseOffset(offsetStr); }
+    catch { log(`❌ Dòng ${i+1}: offset không hợp lệ "${offsetStr}"`, 'log-err'); return null; }
+
+    let newBytes;
+    try { newBytes = parseHex(hexStr); }
+    catch (err) { log(`❌ Dòng ${i+1}: hex không hợp lệ — ${err.message}`, 'log-err'); return null; }
+
+    let origBytes = null;
+    if (origLines) {
+      while (origIdx < origLines.length && !origLines[origIdx].trim()) origIdx++;
+      if (origIdx >= origLines.length) {
+        log(`⚠️ Không có hex gốc tương ứng cho dòng ${i+1}`, 'log-warn');
+      } else {
+        try { origBytes = parseHex(origLines[origIdx]); }
+        catch (err) { log(`❌ Hex gốc dòng ${origIdx+1}: ${err.message}`, 'log-err'); return null; }
+        origIdx++;
+      }
+    }
+
+    patches.push({ offset, newBytes, origBytes });
+  }
+  return patches;
+}
+
+// ===== Do patch =====
+function doPatch(dryRun) {
+  clearLog();
+
+  if (!fileBuffer) { log('❌ Chưa có file', 'log-err'); return; }
+
+  const patched = new Uint8Array(fileBuffer);
+  let totalPatched = 0;
+
+  if (currentMode === 'auto') {
+    let origBytes, newBytes;
+    try {
+      origBytes = parseHex(document.getElementById('hexOrig').value);
+      newBytes = parseHex(document.getElementById('hexNew').value);
+    } catch (err) { log('❌ Lỗi parse hex: ' + err.message, 'log-err'); return; }
+
+    if (origBytes.length === 0) { log('❌ Hex gốc rỗng', 'log-err'); return; }
+    if (origBytes.length !== newBytes.length) {
+      log(`❌ Số byte không khớp: gốc ${origBytes.length}, mới ${newBytes.length}`, 'log-err');
+      return;
+    }
+
+    log(`🔍 Đang tìm: ${bytesToHex(origBytes)}`, 'log-info');
+    const positions = findAll(fileBuffer, origBytes);
+
+    if (positions.length === 0) {
+      log('❌ Không tìm thấy chuỗi hex gốc trong file!', 'log-err');
+      return;
+    }
+
+    log(`✅ Tìm thấy ${positions.length} vị trí:`, 'log-ok');
+    positions.forEach((pos, i) => {
+      log(`   [${i+1}] 0x${pos.toString(16).toUpperCase()} → ${bytesToHex(newBytes)}`, 'log-info');
+    });
+
+    if (!dryRun) {
+      positions.forEach(pos => patched.set(newBytes, pos));
+      totalPatched = positions.length;
+    }
+  } else {
+    // OFFSET MODE
+    const patches = parsePatchList();
+    if (!patches) return;
+    if (patches.length === 0) { log('❌ Danh sách patch rỗng', 'log-err'); return; }
+
+    log(`📋 Có ${patches.length} patch cần thực hiện:`, 'log-info');
+    log('', 'log-dim');
+
+    let okCount = 0, failCount = 0;
+
+    patches.forEach((p, i) => {
+      const offsetHex = '0x' + p.offset.toString(16).toUpperCase();
+      const endPos = p.offset + p.newBytes.length;
+
+      // Check bounds
+      if (p.offset < 0 || endPos > fileBuffer.length) {
+        log(`❌ [${i+1}] ${offsetHex}: vượt quá kích thước file`, 'log-err');
+        failCount++;
+        return;
+      }
+
+      // Verify gốc
+      if (p.origBytes) {
+        const actual = fileBuffer.slice(p.offset, p.offset + p.origBytes.length);
+        const match = p.origBytes.length === actual.length &&
+                      p.origBytes.every((b, j) => b === actual[j]);
+        if (!match) {
+          log(`❌ [${i+1}] ${offsetHex}: hex gốc không khớp!`, 'log-err');
+          log(`     Mong đợi: ${bytesToHex(p.origBytes)}`, 'log-dim');
+          log(`     Thực tế:  ${bytesToHex(actual)}`, 'log-dim');
+          failCount++;
+          return;
+        }
+      }
+
+      const oldBytes = fileBuffer.slice(p.offset, endPos);
+      log(`✅ [${i+1}] ${offsetHex}`, 'log-ok');
+      log(`     Cũ: ${bytesToHex(oldBytes)}`, 'log-dim');
+      log(`     Mới: ${bytesToHex(p.newBytes)}`, 'log-info');
+
+      if (!dryRun) {
+        patched.set(p.newBytes, p.offset);
+        totalPatched++;
+      }
+      okCount++;
+    });
+
+    log('', 'log-dim');
+    log(`📊 Tổng: ${okCount} OK, ${failCount} lỗi`, failCount ? 'log-warn' : 'log-ok');
+
+    if (dryRun) {
+      log('👁️ Đây là chế độ xem trước, chưa patch file thật.', 'log-warn');
+      return;
+    }
+
+    if (totalPatched === 0) {
+      log('❌ Không có patch nào được áp dụng.', 'log-err');
+      return;
+    }
+  }
+
+  if (dryRun) {
+    log('👁️ Đây là chế độ xem trước, chưa patch file thật.', 'log-warn');
+    return;
+  }
+
+  // Download
+  const blob = new Blob([patched], { type: 'application/octet-stream' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  const dotIdx = fileName.lastIndexOf('.');
+  const newName = dotIdx > 0
+    ? fileName.slice(0, dotIdx) + '_patched' + fileName.slice(dotIdx)
+    : fileName + '_patched';
+  a.href = url;
+  a.download = newName;
+  a.click();
+  URL.revokeObjectURL(url);
+
+  log('', 'log-dim');
+  log(`💾 Đã patch ${totalPatched} vị trí và tải về: ${newName}`, 'log-ok');
+}
+
+patchBtn.addEventListener('click', () => doPatch(false));
+previewBtn.addEventListener('click', () => doPatch(true));
+</script>
+</body>
+</html>
